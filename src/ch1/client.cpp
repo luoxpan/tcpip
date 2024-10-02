@@ -14,7 +14,8 @@ int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        std::cerr << "Usage : " << argv[0] << " port\n";
+        std::cerr << "port: " << argv[0] << std::endl;
+        exit(1);
     }
     int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1)
