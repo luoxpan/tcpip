@@ -1,0 +1,6 @@
+{
+    "C_Cpp.default.compilerPath": "/home/lxp/projectCPP/tcpip/src/ch1/client.cpp",
+    "files.associations": {
+        "system_error": "cpp"
+    }
+}

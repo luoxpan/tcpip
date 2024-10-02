@@ -1,4 +1,6 @@
 #include <iostream>
+#include <cstring>
+#include <memory>
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -14,7 +16,7 @@ int main(int argc, char *argv[])
 {
     if (argc != 2)
     {
-        std::cerr << "Usage : " << argv[0] << " port\n";
+        error_handling("Need a port for ./server");
     }
     int serv_sock = socket(AF_INET, SOCK_STREAM, 0);
     if (serv_sock == -1)
@@ -38,7 +40,7 @@ int main(int argc, char *argv[])
     }
 
     struct sockaddr_in clnt_addr;
-    int clnt_addr_size = sizeof(clnt_addr);
+    socklen_t clnt_addr_size = sizeof(clnt_addr);
     int clnt_sock = accept(serv_sock, reinterpret_cast<struct sockaddr *>(&clnt_addr), &clnt_addr_size);
     if (clnt_sock == -1)
     {
