@@ -8,6 +8,8 @@
 #include <memory>
 #include <unistd.h>
 #include <arpa/inet.h>
+#include <fcntl.h>
+#include <errno.h>
 
 const int BUF_SIZE = 4;
 const int EPOLL_SIZE = 50;
@@ -17,6 +19,11 @@ void error_handling(const char *message)
     exit(1);
 }
 
+void set_nonblocking_mode(int fd)
+{
+    int flag = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flag | O_NONBLOCK);
+}
 int main(int argc, char *argv[])
 {
     if (argc != 2)
@@ -29,6 +36,9 @@ int main(int argc, char *argv[])
     {
         error_handling("socket() error");
     }
+    // 1. serv_sock改为非阻塞
+    set_nonblocking_mode(serv_sock);
+
     struct sockaddr_in serv_addr;
     memset(&serv_addr, 0, sizeof(serv_addr));
     serv_addr.sin_family = AF_INET;
@@ -78,7 +88,10 @@ int main(int argc, char *argv[])
                 {
                     error_handling("accept() error");
                 }
-                event.events = EPOLLIN;
+                set_nonblocking_mode(clnt_sock);
+                // 2. 新加的与客户端连接的套接字加上边缘触发
+                // event.events = EPOLLIN;
+                event.events = EPOLLIN | EPOLLET;
                 event.data.fd = clnt_sock;
                 if (epoll_ctl(epfd, EPOLL_CTL_ADD, clnt_sock, &event) == -1)
                 {
@@ -88,19 +101,29 @@ int main(int argc, char *argv[])
             }
             else
             {
-                int str_len = read(ep_events[i].data.fd, buf, BUF_SIZE);
-                if (str_len == 0)
+                // ET 模式需要循环读取
+                while (true)
                 {
-                    if (epoll_ctl(epfd, EPOLL_CTL_DEL, ep_events[i].data.fd, nullptr) == -1)
+                    int str_len = read(ep_events[i].data.fd, buf, BUF_SIZE);
+                    if (str_len == 0)
                     {
-                        error_handling("epoll_ctl() for i.data.fd error");
+                        if (epoll_ctl(epfd, EPOLL_CTL_DEL, ep_events[i].data.fd, nullptr) == -1)
+                        {
+                            error_handling("epoll_ctl() for i.data.fd error");
+                        }
+                        close(ep_events[i].data.fd);
+                        printf("colsed client:%d\n", ep_events[i].data.fd);
+                        break; // 边缘模式，退出while循环
                     }
-                    close(ep_events[i].data.fd);
-                    printf("colsed client:%d\n", ep_events[i].data.fd);
-                }
-                else
-                {
-                    write(ep_events[i].data.fd, buf, str_len);
+                    else if (str_len < 0)
+                    {
+                        if (errno == EAGAIN) // 读到没有数据可读
+                            break;
+                    }
+                    else
+                    {
+                        write(ep_events[i].data.fd, buf, str_len);
+                    }
                 }
             }
         }
